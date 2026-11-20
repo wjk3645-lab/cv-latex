@@ -17,11 +17,25 @@ jobs:
           fetch-depth: 0
 
       - name: Compile LaTeX document
+        id: compile
+        continue-on-error: true
         uses: xu-cheng/latex-action@v2
         with:
           root_file: main.tex
 
+      - name: Commit build log for debugging
+        if: always()
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git checkout --orphan temp_debug
+          git rm -rf . 2>/dev/null || true
+          git add -f main.log main.aux main.out 2>/dev/null || true
+          git commit --allow-empty -m "build log" || true
+          git push -f origin temp_debug:debug || true
+
       - name: Create release branch with only PDF
+        if: steps.compile.outcome == 'success'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
@@ -32,6 +46,7 @@ jobs:
           git push -f origin temp_release:release
 
       - name: Create GitHub Release
+        if: steps.compile.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
